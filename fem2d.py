@@ -13,33 +13,36 @@ FEM2DProblem contains all the variables used for
 '''
 class FEM2DProblemData():
     
+    def set_default(self, var_name, default_val):
+        if(not var_name in self.vars.keys()):
+            self.vars[var_name] = default_val
     '''
     **kwargs are name, values to fill card
     card format:
         ----- card 1
-        title
+        title \ has default value
         ----- card 2
         itype
         igrad
         item
         neign
         ----- card 3 skip card 3 if neign=0
-        nvalu
-        nvctr
+        nvalu \ has default value 0
+        nvctr \ has default value 0
         ----- card 4
         ieltyp
         npe
         mesh
-        nprnt
+        nprnt \ has default value 1
         ----- card 5 skip card 5 if mesh=1
         nem
         nnm
         ----- card 6 skip cards 6-7 if mesh!=0, read card 6 for each element
         nod
-        ----- card 7 loop on 1...nnm and x and y coordinate
+        ----- card 7 read for each node
         glxy
         ----- card 8 skip cards 8-11 if mesh<=1
-        nrecl
+        nrecl \ generated automatically
         ----- card 9 read card 9 nrecl times
         nod1
         nodl
@@ -50,7 +53,7 @@ class FEM2DProblemData():
         yl
         ratio
         ----- card 10
-        nrecel
+        nrecel \ generated automatically
         ----- card 11 read card 11 nrecel times
         nel1
         nell
@@ -59,22 +62,22 @@ class FEM2DProblemData():
         npe
         nodei
         ----- card 12 skip cards 12-14 if mesh!=1
-        nx
-        ny
+        nx \ generated automatically
+        ny \ generated automatically
         ----- card 13
         x0
-        dxi
+        dx
         ----- card 14
         y0
-        dyi
+        dy
         ----- card 15
-        nspv
+        nspv \ generated automatically
         ----- card 16 skip card 16 if nspv=0, repeat nspv times
         ispv
         ----- card 17 if nspv=0 or neign!=0
         vspv
         ----- card 18 skip card 18 if neign!=0
-        nssv
+        nssv \ generated automatically
         ----- card 19 skip card 19 if nssv=0 or neign!=0
         issv
         ----- card 20 skip card 20 if nssv=0 or neign!=0
@@ -92,7 +95,7 @@ class FEM2DProblemData():
         ----- card 24
         iconv
         ----- card 25
-        nbe
+        nbe \ generated automatically
         ----- card 26 repeat nbe times
         ibn
         beta
@@ -141,10 +144,20 @@ class FEM2DProblemData():
         ----- card 37 skip card 37 item<=0 or neign!=0 or intial=0, repeat neq times
         glv
         
-    '''  
+    '''
+    
     def __init__(self, nodes_per_element, print_sol=True, **kwargs):
         self.vars = kwargs
         self.card = ''
+        
+        # fill default values
+        self.set_default('title', 'FEM 2D problem data')
+        self.set_default('nvalu', 0)
+        self.set_default('nvctr', 0)
+        self.set_default('nprnt', 1)
+        
+        for k, v in self.vars.items():
+            setattr(self, k, v)
         
         
     def add_card(self, *args):
@@ -154,7 +167,98 @@ class FEM2DProblemData():
     
     def build_cards(self):
         self.card = '' # clear card
-        ############ cards 1-4, 10
+        ############ cards 1, 2
+        self.add_card(self.title)
+        self.add_card(self.itype, self.igrad, self.item, self.neign)
+        ############ card 3
+        if(self.neign != 0):
+            self.add_card(self.nvalu, self.nvctr)
+        ############ card 4
+        self.add_card(self.ieltyp, self.npe, self.mesh, self.nprnt)
+        ############ card 5
+        if(self.mesh != 1):
+            self.add_card(self.nem, self.nnm)
+        ############ card 6, 7
+        if(self.mesh==0):
+            for elem in self.nod:
+                self.add_card(*elem)
+            for elem in self.glxy:
+                self.add_card(*elem)
+        ############ cards 8-11
+        if(self.mesh > 1): 
+            self.add_card(len(self.nod1)) # nrecl
+            for i in range(len(self.nod1)):
+                self.add_card(self.nod1[i], self.nodl[i], self.nodinc[i], 
+                        self.x1[i], self.y1[i], self.xl[i], self.yl[i], self.ratio)
+            self.add_card(len(self.nel1)) # nrecel
+            for i in range(len(self.nel1)):
+                self.add_card(self.nel1[i], self.nell[i], self.ielinc[i], 
+                        self.nodinc[i], self.npe[i], *self.node[i])
+        ############ cards 12-14
+        if(self.mesh==1):
+            self.add_card(len(self.dx), len(self.dy)) # nx, ny
+            self.add_card(self.x0, *self.dx)
+            self.add_card(self.y0, *self.dy)
+        ############ cards 15-17
+        if(not hasattr(self, 'ispv')):
+            self.add_card(0) # nspv
+        else:
+            self.add_card(len(self.ispv)) # nspv
+            for node in self.ispv:
+                self.add_card(*node)
+            if(self.neign == 0):
+                for v in self.vspv:
+                    self.add_card(v)
+        ############ cards 18-20
+        if(not hasattr(self, 'issv')):
+            self.add_card(0)
+        else:
+            self.add_card(len(self.issv))
+            for node in self.issv:
+                self.add_card(*node)
+            if(self.neign == 0):
+                for v in self.vssv:
+                    self.add_card(v)
+        ############ cards 21-27
+        if(self.itype==0):
+            self.add_card(self.a10, self.a1x, self.a1y)
+            self.add_card(self.a20, self.a2x, self.a2y)
+            self.add_card(self.a00)
+            self.add_card(self.iconv)
+            if(self.iconv!=0):
+                if(not hasattr(self, 'ibn')):
+                    self.add_card(0) # nbe
+                else:
+                    self.add_card(len(self.ibn)) # nbe
+                    for i in range(len(self.ibn)):
+                        self.add_card(self.ibn[i], self.beta[i], self.tinf[i])
+                    for i in self.inod:
+                        self.add_card(*self.inod)
+        ############ card 28
+        if(self.itype==1):
+            self.add_card(self.viscsity, self.penalty)
+        ############ cards 29, 30
+        if(self.itype==2):
+            self.add_card(self.lnstrs)
+            self.add_card(self.e1, self.e2, self.anu12, self.g12, self.thkns)
+        ############ card 31
+        if(self.itype==3 or self.itype==5):
+            self.add_card(self.e1, self.e2, self.anu12, self.g12, self.g13, self.g23, self.thkns)
+        ############ card 32
+        if(self.neign==0):
+            self.add_card(self.f0, self.fx, self.fy)
+        ############ cards 33-37
+        if(self.item!=0):
+            self.add_card(self.c0, self.cx, self.cy)
+            if(self.neign==0):
+                self.add_card(self.ntime, self.nstp, self.intvl, self.intial)
+                self.add_card(self.dt, self.alfa, self.gama, self.epsln)
+                if(self.intial!=0):
+                    for i in self.glu:
+                        self.add_card(i)
+        if(self.item>0 and self.neign==0 and self.intial!=0):
+            for i in self.glv:
+                self.add_card(i)
         return self.card
     
     def save_card(self, filename):
