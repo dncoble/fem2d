@@ -1,5 +1,13 @@
 # fem2d
 Python wrapper for FEM2D program from J.N. Reddy. Use this to generate the problem data cards or alternatively solve straight from python. Postprocessing uses a polynomial fit to smooth the solution.
+
+<p align="center">
+<img src="/example problem/vector field.png" alt="drawing" width="400"/>
+</p>
+<p align="center">
+Shear stress field from a torsion problem.
+</p>
+
 ## How to use
 ### FEM2DProblemData
 I highly recommend initializing `FEM2DProblemData` with the arrays `elem_connectivity` and `node_cords` generated with another software. Pass the problem data as a dictionary to `**kwargs`. After running `postprocess`, the variables `u`, `qx`, and `qy` can be accessed using `get_var`.
