@@ -8,6 +8,8 @@ MIT License
 import subprocess
 import os
 import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn import linear_model
 '''
 FEM2DProblem contains all the variables used for
 '''
@@ -35,12 +37,12 @@ class FEM2DProblemData():
         mesh
         nprnt \ has default value 1
         ----- card 5 skip card 5 if mesh=1
-        nem
-        nnm
+        nem \ generated automatically
+        nnm \ generated automatically
         ----- card 6 skip cards 6-7 if mesh!=0, read card 6 for each element
-        nod
+        nod \ taken from elem_connectivity
         ----- card 7 read for each node
-        glxy
+        glxy \ taken from node_coords
         ----- card 8 skip cards 8-11 if mesh<=1
         nrecl \ generated automatically
         ----- card 9 read card 9 nrecl times
@@ -145,10 +147,13 @@ class FEM2DProblemData():
         glv
         
     '''
-    
-    def __init__(self, nodes_per_element, print_sol=True, **kwargs):
+    def __init__(self, elem_connectivity, node_coords, print_sol=True, **kwargs):
         self.vars = kwargs
         self.card = ''
+        self.elem_connectivity = elem_connectivity
+        self.node_coords = node_coords
+        self.print_sol = print_sol
+        self.solved = False
         
         # fill default values
         self.set_default('title', 'FEM 2D problem data')
@@ -158,8 +163,8 @@ class FEM2DProblemData():
         
         for k, v in self.vars.items():
             setattr(self, k, v)
-        
-        
+    
+    
     def add_card(self, *args):
         for arg in args:
             self.card += str(arg) + ' '
@@ -177,12 +182,12 @@ class FEM2DProblemData():
         self.add_card(self.ieltyp, self.npe, self.mesh, self.nprnt)
         ############ card 5
         if(self.mesh != 1):
-            self.add_card(self.nem, self.nnm)
+            self.add_card(len(self.elem_connectivity), len(self.node_coords)) # nem, nnm
         ############ card 6, 7
         if(self.mesh==0):
-            for elem in self.nod:
+            for elem in self.elem_connectivity:
                 self.add_card(*elem)
-            for elem in self.glxy:
+            for elem in self.node_coords:
                 self.add_card(*elem)
         ############ cards 8-11
         if(self.mesh > 1): 
@@ -211,9 +216,9 @@ class FEM2DProblemData():
                     self.add_card(v)
         ############ cards 18-20
         if(not hasattr(self, 'issv')):
-            self.add_card(0)
+            self.add_card(0) # nssv
         else:
-            self.add_card(len(self.issv))
+            self.add_card(len(self.issv)) # nssv
             for node in self.issv:
                 self.add_card(*node)
             if(self.neign == 0):
@@ -280,4 +285,66 @@ class FEM2DProblemData():
             print(solution_card)
         os.remove('tempcard.inp')
         os.remove('solved_card.txt')
+        self.solved = True
+        self.solution_card = solution_card
         return solution_card
+    
+    '''
+    collect data on primary and secondary variables from the solution card
+    '''
+    def postprocess(self, poly_order=3):
+        if(not self.solved):
+            return
+        i = self.solution_card.index('Primary DOF\n') + 81
+        j0 = self.solution_card.index('Orientation')
+        j1 = j0 - 307
+        j2 = j0 + 93
+        l = self.solution_card[i:j1]
+        n = [j.split(' ') for j in l.split('\n')]
+        m = []
+        for k in n:
+            r = []
+            for j in k:
+                if j != '':
+                    r.append(float(j))
+            m.append(r)
+        prim_mat = np.array(m)
+        l = self.solution_card[j2:-109]
+        n = [j.split(' ') for j in l.split('\n')]
+        m = []
+        for k in n:
+            r = []
+            for j in k:
+                if j != '':
+                    r.append(float(j))
+            m.append(r)
+        sec_mat = np.array(m)
+        
+        prim_mat = prim_mat[:,1:]
+        sec_mat = sec_mat[:,:4]
+        
+        self.poly_features = PolynomialFeatures(degree=poly_order)
+        prim_features = self.poly_features.fit_transform(prim_mat[:,0:2])
+        sec_features = self.poly_features.fit_transform(sec_mat[:,0:2])
+        
+        # create linear models and save the predict functions
+        self.u = linear_model.LinearRegression().fit(prim_features, prim_mat[:,2]).predict
+        self.qy = linear_model.LinearRegression().fit(sec_features, sec_mat[:,2]).predict
+        self.qx = linear_model.LinearRegression().fit(sec_features, sec_mat[:,3]).predict
+        
+        return prim_mat, sec_mat
+    
+    """
+    get variable from solved solution
+    var: one of 'u', 'qx', 'qy'
+    x: array of points
+    """
+    def get_var(self, var, x):
+        if(not self.solved):
+            return
+        if(var == 'u'):
+            return self.u(self.poly_features.transform(x))
+        if(var == 'qy'):
+            return self.qy(self.poly_features.transform(x))
+        if(var == 'qx'):
+            return self.qx(self.poly_features.transform(x))
