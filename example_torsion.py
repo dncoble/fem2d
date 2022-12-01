@@ -6,7 +6,7 @@ from math import sqrt
 Using fem2d to solve a sample problem with torsion in an elliptical cross
 section beam.
 
-Mesh node coordinates and element connections are saved in ./example data/
+Mesh node coordinates and element connections are saved in ./example problem/
 """
 from fem2d import FEM2DProblemData
 #%% problem data
@@ -14,8 +14,8 @@ Gtheta = 10
 a = 1 # minor axis length
 b = 1.3 # major axis length
 
-elem_connectivity = np.load('./example data/elem.npy')
-node_coords = np.load('./example data/node.npy')
+elem_connectivity = np.load('./example problem/elem.npy')
+node_coords = np.load('./example problem/node.npy')
 problem_data = {}
 
 problem_data['itype'] = 0
@@ -108,3 +108,4 @@ plt.xticks([0, 1])
 plt.yticks([0, 1])
 plt.xlim((-.2, 1.5))
 plt.tight_layout()
+plt.savefig('./example problem/vector field.png', dpi=500)
