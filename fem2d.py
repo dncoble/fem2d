@@ -147,7 +147,7 @@ class FEM2DProblemData():
         glv
         
     '''
-    def __init__(self, elem_connectivity, node_coords, print_sol=True, **kwargs):
+    def __init__(self, elem_connectivity=None, node_coords=None, print_sol=True, **kwargs):
         self.vars = kwargs
         self.card = ''
         self.elem_connectivity = elem_connectivity
