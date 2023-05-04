@@ -24,7 +24,7 @@ u = fea_mesh.get_var('u', points_of_interest)
 qx = fea_mesh.get_var('qx', points_of_interest)
 qy = fea_mesh.get_var('qy', points_of_interest)
 ```
-See [data_format.md](data_format.md) for how to format the problem data dictionary. Variables follow same names as given in the FEM2D Input Description. Some data is generated automatically when the information is redundant.
+Variables follow same names as given in the FEM2D Input Description. Some data is generated automatically when the information is redundant.
 
 ## License
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
